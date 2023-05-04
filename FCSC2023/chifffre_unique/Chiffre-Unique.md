@@ -7,6 +7,62 @@
 Vous devez trouver un moyen d'afficher le flag.
 SHA256(`chiffre-unique`) = `8da5abc1b4350d795e41d273560b06e470fb61165af12d08c69df467428a409a`.
 
+# Some information about the binary
+
+The binary is an ELF executable, 64 bit x86-64.
+```bash
+[ FCSC2023/reverse/chiffre_unique ] & file chiffre-unique
+chiffre-unique: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=bbafb6f0fb93b0ddabb85c3ac85684faa0f77426, for GNU/Linux 3.2.0, stripped
+```
+
+Running strings, we see it uses SHA256 at one time:
+```bash
+[ FCSC2023/reverse/chiffre_unique ] & strings chiffre-unique                 
+[...]
+SHA256_Init
+SHA256_Final
+SHA256_Update
+
+[...]
+
+FCSC{
+%02x
+Invalid argument.
+Congratulations ! 
+Input incorrect.
+;*3$"
+
+[...]
+```
+
+
+What are the libraries used:
+```bash
+[ FCSC2023/reverse/chiffre_unique ] & ldd chiffre-unique
+	linux-vdso.so.1 (0x00007ffceb7c6000)
+	libcrypto.so.1.1 => /usr/lib/libcrypto.so.1.1 (0x00007faf5a200000)
+	libc.so.6 => /usr/lib/libc.so.6 (0x00007faf5a019000)
+	/lib64/ld-linux-x86-64.so.2 => /usr/lib64/ld-linux-x86-64.so.2 (0x00007faf5a540000)
+```
+
+`libcrypto.so.1.1` must be used for the SHA256 manipulation we saw while running `strings`.
+
+
+If we try to run `chiffre-unique`, the program waits for us to input some data.
+
+```bash
+[ FCSC2023/reverse/chiffre_unique ] & ./chiffre-unique
+g
+Input incorrect.
+
+[ FCSC2023/reverse/chiffre_unique ] & ./chiffre-unique
+a
+c
+x
+Input incorrect.
+```
+
+Looks like the number of input asked depends on what we enter. Let's dive into the binary !
 # Opening binary ninja
 
 I mainly work with the Low level view of Binary Ninja (replacing some simple asm instructions by C code like `if` conditions, or variable assignement). 
