@@ -542,21 +542,21 @@ A quick reminder: registers address are found thanks to the value we give to the
 7c b0 00 00 00 63 3d  21 11 22 52 19 33 09 51 3b 7b 3b 2b 72 6c 62 7a  2d 0e 6b 11 17 02 16 51 30 59 33 59 17 4c 12 55 31 0a 24 5e 16 09 58 14 42 43 06 62 56 4f 20 34 43 79 47 14 4e 2a 1e 36 42 79 47 3b 72 10 7a 34 42 79 03 35 25 44 46 46 5a 42 03 66 7a 36 7c 67 7e 23 44 5a 59 34 7e 6c 00 6f 7d 74 21 4f 23 32 42 79 47 12 30 6d 62 34 42 5a 04 35 72 6c 62 08 06 27 03 77 4c 28 49 67 01 54 06 73 53 9e 9d cb bd 43 14 74 0e 74 62 34 42 3a 28 5f 15 1e 03 40 31 58 67 68 1d 19 10 14 24 15 26 56 52 05 11 0e 62 43 06 62 56 32 23 75 6c 59 14 66 33 2b # Load this data into the local stack (size of 0xb0)
 5e 45 45 # XOR REG4 with itself -> set REG4 at 0
 23 41 2c 00 00 00 # Load 0x2c into REG0
-3a 42 53 # Move top_of_local_stack value into REG1       <--------------------\
-3a 53 44 # Set top_of_local_stack value to REG3 value                         |
-2b 53 45 # Add REG4 and top_of_local_stack adn store the result in top_of_local_stack                                                            |
-3c 43 # Pop the 4 bytes on top of the stack into REG2                         |
-3a 53 42 # Set top_of_local_stack value to value in REG1                      |
-3c 42 # Pop the 4 bytes on top of the stack to REG1                           |
-5e 42 43 # XOR REG1 and REG2 and store the result in REG1                     |
-3e 42 # Copy REG1 value to the address second_malloc + top_of_local_stack     |
-23 46 04 00 00 00 # Set REG5 to 0x04                                          |
-2b 53 46 # Add REG5 = 4 to top_of_local_stack                                 |
-2b 45 46 # Add REG5 = 4 to REG4                                               |
-26 45 46 # Perform an AND on REG4 and REG5 and store the result in REG4       |
-23 46 01 00 00 00 # Set REG5 to 0x01                                          |
-2d 41 46 # Sub REG5 = 1 to REG0                                               |
-21 d2 ff ff ff # Loop condition: if REG != 0, jmp to iterator + 0xffffffd2 (46| bytes en arrière)     --------------------------------------------------------/
+3a 42 53 # Move top_of_local_stack value into REG1                             <--------------------\
+3a 53 44 # Set top_of_local_stack value to REG3 value                                                |
+2b 53 45 # Add REG4 and top_of_local_stack adn store the result in top_of_local_stack                |
+3c 43 # Pop the 4 bytes on top of the stack into REG2                                                |
+3a 53 42 # Set top_of_local_stack value to value in REG1                                             |
+3c 42 # Pop the 4 bytes on top of the stack to REG1                                                  |
+5e 42 43 # XOR REG1 and REG2 and store the result in REG1                                            |
+3e 42 # Copy REG1 value to the address second_malloc + top_of_local_stack                            |
+23 46 04 00 00 00 # Set REG5 to 0x04                                                                 |
+2b 53 46 # Add REG5 = 4 to top_of_local_stack                                                        |
+2b 45 46 # Add REG5 = 4 to REG4                                                                      |
+26 45 46 # Perform an AND on REG4 and REG5 and store the result in REG4                              |
+23 46 01 00 00 00 # Set REG5 to 0x01                                                                 |
+2d 41 46 # Sub REG5 = 1 to REG0                                                                      |
+21 d2 ff ff ff # Loop condition: if REG != 0, jmp to iterator + 0xffffffd2 (46 bytes en arrière)  ---/
 23 46 00 01 00 00 # Load 0x0100 to REG5
 2d 53 46 # Sub REG5 = 0x0100 to top_of_local_stack
 28 09 63 68 65 63 6b 5f 6b 65 79 # Call the function "check_key" if found
@@ -564,11 +564,35 @@ A quick reminder: registers address are found thanks to the value we give to the
 
 If you rememmber corretly, I launched the binary at the beginning and the error was that the program couldn't retrieve the `check_key` function. Indeed, at first glance, it is not in the program.
 
-However if you look carefully, it loops over the big data chunk (of size `0xb0`) that makes absolutely no sense and XOR it with our user input.
+However if you look carefully, it loops over the big data chunk (of size `0xb0`) that makes absolutely no sense and XOR it with our user input. 
 
-From the operations made, we can conclude the key is 8 chars long (it doesn't use the bytes after the 8 firsts).
+Indeed, it loops and take 4 bytes after 4 bytes of this blob of data and XOR it with the user input (the key we need to find). 
 
-We can then perform a known plaintext attack to retrieve the key ! 
+And we can extract some infos about the key we need to find :
+
+```
+5e 45 45 # XOR REG4 with itself -> set REG4 at 0
+[...]
+2b 45 46 # Add REG5 = 4 to REG4
+26 45 46 # Perform an AND on REG4 and REG5 and store the result in REG4
+```
+
+With `REG4` initialized to 0, from the lines above, we can conclude that `REG4` is equal to 0 or 4 ! This is due because it is added 4 and performed an AND on it with the value 4.
+
+Also, this register is used to get the user input bytes 4 by 4, which means the key is 8 chars long. Look at those lines:
+
+```
+25 # Wait for user input and stores it on the stack
+3a 44 53 # Move top_of_local_stack value into REG3 (so the offset to access user_input)
+[...]
+3a 53 44 # Set top_of_local_stack value to REG3 value
+2b 53 45 # Add REG4 and top_of_local_stack adn store the result in top_of_local_stack
+3c 43 # Pop the 4 bytes on top of the stack into REG2 
+```
+
+Thus, it accesses `user_input[:4]` when `REG4 = 0` and `user_input[4:8]` when `REG4 = 4`.
+
+Now we know the key is only 8 chars long, we can then perform a known plaintext attack to retrieve the key ! 
 
 Huh .. ?
 
