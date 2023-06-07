@@ -9,3 +9,5 @@ wanted to explore in more depth this year.
 Below, is the evolution of my score with time:
 
 ![](./score/curve_score_404.png)
+
+Once again, thanks to the organizers for this awesome CTF ! I enjoyed it very much and is waiting for joining in the next one next year !!
